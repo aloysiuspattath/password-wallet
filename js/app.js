@@ -7,6 +7,8 @@ const App = {
     currentFilter: 'all',
     selectedTeam: null,
     editingPassword: null,
+    fileHandle: null, // For File System Access API auto-sync
+    autoSyncEnabled: false,
 
     init() {
         if (Auth.isLoggedIn()) {
@@ -298,6 +300,7 @@ const App = {
             this.renderPasswords();
             this.updateCounts();
             this.showToast(this.editingPassword ? 'Password updated!' : 'Password saved!', 'success');
+            this.autoSave(); // Auto-sync if enabled
         } catch (error) {
             this.showToast('Failed to save password', 'error');
         }
@@ -362,6 +365,7 @@ const App = {
         this.renderPasswords();
         this.updateCounts();
         this.showToast('Password deleted', 'success');
+        this.autoSave(); // Auto-sync if enabled
     },
 
     showPasswordDetails(id, isTeam = false) {
@@ -451,6 +455,7 @@ const App = {
         this.renderTeams();
         this.updateCounts();
         this.showToast(`Team "${teamName}" created!`, 'success');
+        this.autoSave(); // Auto-sync if enabled
 
         // Show invite code
         setTimeout(() => {
@@ -508,6 +513,7 @@ const App = {
         this.renderTeams();
         this.updateCounts();
         this.showToast(`Joined team "${team.name}"!`, 'success');
+        this.autoSave(); // Auto-sync if enabled
     },
 
     // ===== Utility Methods =====
@@ -567,9 +573,79 @@ const App = {
         return div.innerHTML;
     },
 
-    // ===== Database Sync Methods =====
-    loadDatabase() {
-        document.getElementById('dbFileInput').click();
+    // ===== Database Sync Methods (File System Access API) =====
+
+    // Check if File System Access API is supported
+    hasFileSystemAccess() {
+        return 'showOpenFilePicker' in window;
+    },
+
+    async loadDatabase() {
+        if (this.hasFileSystemAccess()) {
+            try {
+                // Use File System Access API
+                const [handle] = await window.showOpenFilePicker({
+                    types: [{
+                        description: 'JSON Database',
+                        accept: { 'application/json': ['.json'] }
+                    }]
+                });
+                this.fileHandle = handle;
+                this.autoSyncEnabled = true;
+                await this.readFromFileHandle();
+                this.updateSyncStatus(true);
+                this.showToast('Auto-sync enabled! Changes will save automatically.', 'success');
+            } catch (err) {
+                if (err.name !== 'AbortError') {
+                    this.showToast('Failed to open file', 'error');
+                }
+            }
+        } else {
+            // Fallback to file input
+            document.getElementById('dbFileInput').click();
+        }
+    },
+
+    async readFromFileHandle() {
+        if (!this.fileHandle) return;
+        try {
+            const file = await this.fileHandle.getFile();
+            const text = await file.text();
+            const data = JSON.parse(text);
+            this.mergeDatabase(data);
+            this.renderDashboard();
+        } catch (err) {
+            console.error('Read error:', err);
+        }
+    },
+
+    async autoSave() {
+        if (!this.autoSyncEnabled || !this.fileHandle) return;
+        try {
+            const writable = await this.fileHandle.createWritable();
+            const data = {
+                version: '1.0',
+                exportedAt: new Date().toISOString(),
+                users: Storage.get(Storage.KEYS.USERS) || {},
+                passwords: Storage.get(Storage.KEYS.PASSWORDS) || {},
+                teams: Storage.get(Storage.KEYS.TEAMS) || {}
+            };
+            await writable.write(JSON.stringify(data, null, 2));
+            await writable.close();
+        } catch (err) {
+            console.error('Auto-save error:', err);
+            this.autoSyncEnabled = false;
+            this.updateSyncStatus(false);
+        }
+    },
+
+    updateSyncStatus(enabled) {
+        const loadBtn = document.getElementById('loadDbBtn');
+        if (loadBtn) {
+            loadBtn.innerHTML = enabled ? '🔄 Synced' : '📂 Load';
+            loadBtn.style.background = enabled ? 'rgba(16, 185, 129, 0.2)' : '';
+            loadBtn.style.borderColor = enabled ? 'rgba(16, 185, 129, 0.5)' : '';
+        }
     },
 
     handleDbFileLoad(e) {
@@ -588,25 +664,22 @@ const App = {
             }
         };
         reader.readAsText(file);
-        e.target.value = ''; // Reset input
+        e.target.value = '';
     },
 
     mergeDatabase(data) {
-        // Merge users
         if (data.users) {
             const existingUsers = Storage.get(Storage.KEYS.USERS) || {};
             Object.assign(existingUsers, data.users);
             Storage.set(Storage.KEYS.USERS, existingUsers);
         }
 
-        // Merge passwords
         if (data.passwords) {
             const existingPasswords = Storage.get(Storage.KEYS.PASSWORDS) || {};
             for (const email in data.passwords) {
                 if (!existingPasswords[email]) {
                     existingPasswords[email] = [];
                 }
-                // Merge by ID, avoiding duplicates
                 const existingIds = new Set(existingPasswords[email].map(p => p.id));
                 for (const pwd of data.passwords[email]) {
                     if (!existingIds.has(pwd.id)) {
@@ -617,19 +690,16 @@ const App = {
             Storage.set(Storage.KEYS.PASSWORDS, existingPasswords);
         }
 
-        // Merge teams
         if (data.teams) {
             const existingTeams = Storage.get(Storage.KEYS.TEAMS) || {};
             for (const teamId in data.teams) {
                 if (existingTeams[teamId]) {
-                    // Merge members
                     const existingEmails = new Set(existingTeams[teamId].members.map(m => m.email.toLowerCase()));
                     for (const member of data.teams[teamId].members) {
                         if (!existingEmails.has(member.email.toLowerCase())) {
                             existingTeams[teamId].members.push(member);
                         }
                     }
-                    // Merge passwords
                     if (!existingTeams[teamId].passwords) existingTeams[teamId].passwords = [];
                     const existingPwdIds = new Set(existingTeams[teamId].passwords.map(p => p.id));
                     for (const pwd of (data.teams[teamId].passwords || [])) {
@@ -645,28 +715,55 @@ const App = {
         }
     },
 
-    saveDatabase() {
-        const data = {
-            version: '1.0',
-            exportedAt: new Date().toISOString(),
-            users: Storage.get(Storage.KEYS.USERS) || {},
-            passwords: Storage.get(Storage.KEYS.PASSWORDS) || {},
-            teams: Storage.get(Storage.KEYS.TEAMS) || {}
-        };
+    async saveDatabase() {
+        // If auto-sync is enabled, just trigger a save
+        if (this.autoSyncEnabled && this.fileHandle) {
+            await this.autoSave();
+            this.showToast('Database synced!', 'success');
+            return;
+        }
 
-        const json = JSON.stringify(data, null, 2);
-        const blob = new Blob([json], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'teamvault-db.json';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-
-        this.showToast('Database saved! Share this file with your team.', 'success');
+        // Otherwise, use Save As dialog or download
+        if (this.hasFileSystemAccess()) {
+            try {
+                const handle = await window.showSaveFilePicker({
+                    suggestedName: 'teamvault-db.json',
+                    types: [{
+                        description: 'JSON Database',
+                        accept: { 'application/json': ['.json'] }
+                    }]
+                });
+                this.fileHandle = handle;
+                this.autoSyncEnabled = true;
+                await this.autoSave();
+                this.updateSyncStatus(true);
+                this.showToast('Saved! Auto-sync now enabled.', 'success');
+            } catch (err) {
+                if (err.name !== 'AbortError') {
+                    this.showToast('Failed to save file', 'error');
+                }
+            }
+        } else {
+            // Fallback download
+            const data = {
+                version: '1.0',
+                exportedAt: new Date().toISOString(),
+                users: Storage.get(Storage.KEYS.USERS) || {},
+                passwords: Storage.get(Storage.KEYS.PASSWORDS) || {},
+                teams: Storage.get(Storage.KEYS.TEAMS) || {}
+            };
+            const json = JSON.stringify(data, null, 2);
+            const blob = new Blob([json], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'teamvault-db.json';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            this.showToast('Database saved!', 'success');
+        }
     }
 };
 
