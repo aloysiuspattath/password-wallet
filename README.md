@@ -32,16 +32,19 @@ A simple, secure password manager for teams. Share passwords with your team usin
 ### View Invite Code Again
 Click the **⚙️** icon next to any team name to see its invite code.
 
-## 🔄 Syncing Across Team (Shared Database)
+## 🔄 Syncing Across Team
 
-Since data is stored locally, use the **Load/Save** buttons to share:
+### Option 1: Python Server (Recommended - Auto-Sync)
+```bash
+python server.py
+```
+Open http://localhost:8080 - data auto-syncs to `db.json`!
 
-1. **Save** - Downloads `teamvault-db.json` (all your data)
-2. **Share** the file via Google Drive, Dropbox, or email
-3. Team members click **Load** to import the shared data
-4. Data is **merged** - no duplicates, everyone's passwords combined!
-
-> **Tip:** Keep the JSON file in a shared folder. After changes, Save & replace the file. Others Load it to sync.
+### Option 2: Manual Load/Save
+1. **Save** - Downloads encrypted `teamvault-db.json`
+2. **Share** via Google Drive, Dropbox, etc.
+3. Team members click **Load** to import
+4. Data **merges** automatically!
 
 ## 📁 Project Structure
 

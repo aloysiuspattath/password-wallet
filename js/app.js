@@ -7,10 +7,17 @@ const App = {
     currentFilter: 'all',
     selectedTeam: null,
     editingPassword: null,
-    fileHandle: null, // For File System Access API auto-sync
+    fileHandle: null,
     autoSyncEnabled: false,
+    dbEncryptionKey: null,
+    serverMode: false, // True when running on Python server
 
-    init() {
+    async init() {
+        // Check if running on server (not file://)
+        if (window.location.protocol !== 'file:') {
+            await this.checkServerMode();
+        }
+
         if (Auth.isLoggedIn()) {
             this.showDashboard();
         } else {
@@ -18,6 +25,77 @@ const App = {
         }
         this.bindEvents();
     },
+
+    async checkServerMode() {
+        try {
+            const response = await fetch('/api/db');
+            if (response.ok) {
+                this.serverMode = true;
+                this.autoSyncEnabled = true;
+                // Ask for encryption key
+                const encKey = prompt('Enter database encryption password:');
+                if (encKey) {
+                    this.dbEncryptionKey = encKey;
+                    await this.loadFromServer();
+                    this.updateSyncStatus(true);
+                }
+            }
+        } catch (e) {
+            // Not running on Python server, use normal mode
+            this.serverMode = false;
+        }
+    },
+
+    async loadFromServer() {
+        try {
+            const response = await fetch('/api/db');
+            const encryptedData = await response.json();
+
+            if (encryptedData.encrypted && this.dbEncryptionKey) {
+                try {
+                    const decrypted = CryptoUtils.xorDecrypt(encryptedData.encrypted, this.dbEncryptionKey);
+                    const data = JSON.parse(decrypted);
+                    this.mergeDatabase(data);
+                } catch (e) {
+                    this.showToast('Wrong encryption password!', 'error');
+                    this.dbEncryptionKey = null;
+                    this.autoSyncEnabled = false;
+                }
+            } else if (!encryptedData.encrypted && encryptedData.users) {
+                // Unencrypted legacy data
+                this.mergeDatabase(encryptedData);
+            }
+        } catch (e) {
+            console.error('Server load error:', e);
+        }
+    },
+
+    async saveToServer() {
+        if (!this.serverMode || !this.dbEncryptionKey) return;
+        try {
+            const data = {
+                version: '1.0',
+                exportedAt: new Date().toISOString(),
+                users: Storage.get(Storage.KEYS.USERS) || {},
+                passwords: Storage.get(Storage.KEYS.PASSWORDS) || {},
+                teams: Storage.get(Storage.KEYS.TEAMS) || {}
+            };
+            const encrypted = CryptoUtils.xorEncrypt(JSON.stringify(data), this.dbEncryptionKey);
+            const encryptedFile = {
+                version: '1.0',
+                encrypted: encrypted,
+                exportedAt: new Date().toISOString()
+            };
+            await fetch('/api/db', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(encryptedFile)
+            });
+        } catch (e) {
+            console.error('Server save error:', e);
+        }
+    },
+
 
     bindEvents() {
         // Auth tabs
@@ -640,6 +718,12 @@ const App = {
     },
 
     async autoSave() {
+        // If in server mode, save to server
+        if (this.serverMode) {
+            await this.saveToServer();
+            return;
+        }
+
         if (!this.autoSyncEnabled || !this.fileHandle) return;
         if (!this.dbEncryptionKey) {
             this.showToast('No encryption key set', 'error');
