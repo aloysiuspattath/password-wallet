@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TeamVault - Secure Password Manager</title>
+  <meta name="description"
+    content="A secure, modern password manager for teams. Share passwords safely with your team members.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+  <div class="bg-gradient"></div>
+
+  <!-- Auth Page -->
+  <div id="authPage" class="auth-container">
+    <div class="glass-card auth-card">
+      <div class="logo">
+        <span class="logo-icon">🔐</span>
+        TeamVault
+      </div>
+      <p class="auth-subtitle">Secure password sharing for teams</p>
+
+      <div class="auth-tabs">
+        <button class="auth-tab active" data-tab="login">Login</button>
+        <button class="auth-tab" data-tab="register">Register</button>
+      </div>
+
+      <!-- Login Form -->
+      <form id="loginForm">
+        <div class="form-group">
+          <label class="form-label">Email</label>
+          <input type="email" name="email" class="form-input" placeholder="you@example.com" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Master Password</label>
+          <div class="password-field">
+            <input type="password" name="password" class="form-input" placeholder="Enter your master password" required>
+            <button type="button" class="password-toggle">👁️</button>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary">Login</button>
+      </form>
+
+      <!-- Register Form -->
+      <form id="registerForm" class="hidden">
+        <div class="form-group">
+          <label class="form-label">Name</label>
+          <input type="text" name="name" class="form-input" placeholder="Your name" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Email</label>
+          <input type="email" name="email" class="form-input" placeholder="you@example.com" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Master Password</label>
+          <div class="password-field">
+            <input type="password" name="password" class="form-input" placeholder="Min 8 characters" minlength="8"
+              required>
+            <button type="button" class="password-toggle">👁️</button>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary">Create Account</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Dashboard Page -->
+  <div id="dashboardPage" class="hidden">
+    <header class="dashboard-header">
+      <div class="logo">
+        <span class="logo-icon">🔐</span>
+        TeamVault
+      </div>
+      <div class="header-actions">
+        <div class="user-menu">
+          <div class="user-avatar" id="userAvatar">U</div>
+          <span class="user-name" id="userName">User</span>
+        </div>
+        <button id="logoutBtn" class="btn btn-secondary btn-sm">Logout</button>
+      </div>
+    </header>
+
+    <div class="dashboard-content">
+      <div class="dashboard-grid">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+          <div class="sidebar-section">
+            <div class="sidebar-title">Vault</div>
+            <nav class="sidebar-nav">
+              <button class="nav-item active" data-filter="all">
+                <span class="nav-item-icon">📁</span>
+                All Items
+                <span class="nav-item-count" id="allCount">0</span>
+              </button>
+              <button class="nav-item" data-filter="personal">
+                <span class="nav-item-icon">👤</span>
+                Personal
+                <span class="nav-item-count" id="personalCount">0</span>
+              </button>
+              <button class="nav-item" data-filter="team">
+                <span class="nav-item-icon">👥</span>
+                Team Shared
+                <span class="nav-item-count" id="teamCount">0</span>
+              </button>
+            </nav>
+          </div>
+
+          <div class="sidebar-section">
+            <div class="sidebar-title">Teams</div>
+            <nav class="sidebar-nav" id="teamNav">
+              <div style="text-align: center; padding: 1rem; color: var(--text-muted);">No teams yet</div>
+            </nav>
+            <div style="display: flex; gap: 0.5rem; margin-top: 0.75rem;">
+              <button id="createTeamBtn" class="btn btn-secondary btn-sm" style="flex: 1;">+ Create</button>
+              <button id="joinTeamBtn" class="btn btn-secondary btn-sm" style="flex: 1;">🔗 Join</button>
+            </div>
+          </div>
+        </aside>
+
+        <!-- Main Panel -->
+        <main class="main-panel">
+          <div class="panel-header">
+            <h1 class="panel-title">Password Vault</h1>
+            <div class="search-box">
+              <span class="search-icon">🔍</span>
+              <input type="text" id="searchInput" placeholder="Search passwords...">
+            </div>
+            <button id="addPasswordBtn" class="btn btn-primary">➕ Add Password</button>
+          </div>
+
+          <div class="password-list" id="passwordList">
+            <!-- Passwords will be rendered here -->
+          </div>
+        </main>
+      </div>
+    </div>
+  </div>
+
+  <!-- Password Modal -->
+  <div class="modal-overlay" id="passwordModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 class="modal-title" id="passwordModalTitle">Add New Password</h2>
+        <button class="modal-close">✕</button>
+      </div>
+      <form id="passwordForm">
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label">Title *</label>
+            <input type="text" name="title" class="form-input" placeholder="e.g., Google Account" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Username / Email *</label>
+            <input type="text" name="username" class="form-input" placeholder="username or email" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Password *</label>
+            <div class="password-field">
+              <input type="password" name="password" class="form-input" placeholder="Enter password" required>
+              <button type="button" class="password-toggle">👁️</button>
+            </div>
+            <button type="button" id="generatePassword" class="btn btn-secondary btn-sm" style="margin-top: 0.5rem;">🎲
+              Generate Strong Password</button>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Website URL</label>
+            <input type="url" name="url" class="form-input" placeholder="https://example.com">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Save to</label>
+            <select name="team" class="form-input">
+              <option value="">Personal (Private)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Notes</label>
+            <textarea name="notes" class="form-input" rows="2" placeholder="Additional notes..."></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary modal-close">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Password</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Create Team Modal -->
+  <div class="modal-overlay" id="createTeamModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 class="modal-title">Create New Team</h2>
+        <button class="modal-close">✕</button>
+      </div>
+      <form id="createTeamForm">
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label">Team Name *</label>
+            <input type="text" name="teamName" class="form-input" placeholder="e.g., Development Team" required>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary modal-close">Cancel</button>
+          <button type="submit" class="btn btn-primary">Create Team</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Join Team Modal -->
+  <div class="modal-overlay" id="joinTeamModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 class="modal-title">Join a Team</h2>
+        <button class="modal-close">✕</button>
+      </div>
+      <form id="joinTeamForm">
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label">Invite Code *</label>
+            <input type="text" name="inviteCode" class="form-input" placeholder="Enter 8-character code" maxlength="8"
+              style="text-transform: uppercase; letter-spacing: 0.1em;" required>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary modal-close">Cancel</button>
+          <button type="submit" class="btn btn-primary">Join Team</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Team Invite Modal -->
+  <div class="modal-overlay" id="teamInviteModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 class="modal-title" id="inviteModalTitle">Team Invite Code</h2>
+        <button class="modal-close">✕</button>
+      </div>
+      <div class="modal-body">
+        <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+          Share this invite code with your team members so they can join <strong id="inviteTeamName"></strong>:
+        </p>
+        <div class="invite-code-box">
+          <span class="invite-code" id="inviteCodeDisplay">XXXXXXXX</span>
+          <button type="button" id="copyInviteCode" class="btn btn-secondary btn-sm">📋 Copy</button>
+        </div>
+        <p id="teamMemberInfo" style="color: var(--text-muted); margin-top: 1rem; font-size: 0.875rem;"></p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-primary modal-close">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- Scripts -->
+  <script src="js/crypto.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/app.js"></script>
+</body>
+
+</html>
