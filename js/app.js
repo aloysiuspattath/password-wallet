@@ -581,9 +581,13 @@ const App = {
     },
 
     async loadDatabase() {
+        // Ask for encryption password
+        const encKey = prompt('Enter database encryption password:\n(Use the same password across your team)');
+        if (!encKey) return;
+        this.dbEncryptionKey = encKey;
+
         if (this.hasFileSystemAccess()) {
             try {
-                // Use File System Access API
                 const [handle] = await window.showOpenFilePicker({
                     types: [{
                         description: 'JSON Database',
@@ -591,17 +595,16 @@ const App = {
                     }]
                 });
                 this.fileHandle = handle;
-                this.autoSyncEnabled = true;
                 await this.readFromFileHandle();
+                this.autoSyncEnabled = true;
                 this.updateSyncStatus(true);
-                this.showToast('Auto-sync enabled! Changes will save automatically.', 'success');
+                this.showToast('Auto-sync enabled! Data is encrypted.', 'success');
             } catch (err) {
                 if (err.name !== 'AbortError') {
                     this.showToast('Failed to open file', 'error');
                 }
             }
         } else {
-            // Fallback to file input
             document.getElementById('dbFileInput').click();
         }
     },
@@ -611,9 +614,26 @@ const App = {
         try {
             const file = await this.fileHandle.getFile();
             const text = await file.text();
-            const data = JSON.parse(text);
-            this.mergeDatabase(data);
-            this.renderDashboard();
+            const encryptedData = JSON.parse(text);
+
+            // Decrypt the data
+            if (encryptedData.encrypted && this.dbEncryptionKey) {
+                try {
+                    const decrypted = CryptoUtils.xorDecrypt(encryptedData.encrypted, this.dbEncryptionKey);
+                    const data = JSON.parse(decrypted);
+                    this.mergeDatabase(data);
+                    this.renderDashboard();
+                } catch (e) {
+                    this.showToast('Wrong encryption password!', 'error');
+                    this.autoSyncEnabled = false;
+                    this.dbEncryptionKey = null;
+                }
+            } else if (!encryptedData.encrypted) {
+                // Legacy unencrypted file - load and encrypt on next save
+                this.mergeDatabase(encryptedData);
+                this.renderDashboard();
+                this.showToast('Unencrypted file loaded. Will encrypt on save.', 'warning');
+            }
         } catch (err) {
             console.error('Read error:', err);
         }
@@ -621,6 +641,10 @@ const App = {
 
     async autoSave() {
         if (!this.autoSyncEnabled || !this.fileHandle) return;
+        if (!this.dbEncryptionKey) {
+            this.showToast('No encryption key set', 'error');
+            return;
+        }
         try {
             const writable = await this.fileHandle.createWritable();
             const data = {
@@ -630,7 +654,14 @@ const App = {
                 passwords: Storage.get(Storage.KEYS.PASSWORDS) || {},
                 teams: Storage.get(Storage.KEYS.TEAMS) || {}
             };
-            await writable.write(JSON.stringify(data, null, 2));
+            // Encrypt the data
+            const encrypted = CryptoUtils.xorEncrypt(JSON.stringify(data), this.dbEncryptionKey);
+            const encryptedFile = {
+                version: '1.0',
+                encrypted: encrypted,
+                exportedAt: new Date().toISOString()
+            };
+            await writable.write(JSON.stringify(encryptedFile, null, 2));
             await writable.close();
         } catch (err) {
             console.error('Auto-save error:', err);
@@ -717,13 +748,20 @@ const App = {
 
     async saveDatabase() {
         // If auto-sync is enabled, just trigger a save
-        if (this.autoSyncEnabled && this.fileHandle) {
+        if (this.autoSyncEnabled && this.fileHandle && this.dbEncryptionKey) {
             await this.autoSave();
             this.showToast('Database synced!', 'success');
             return;
         }
 
-        // Otherwise, use Save As dialog or download
+        // Ask for encryption key if not set
+        if (!this.dbEncryptionKey) {
+            const encKey = prompt('Set database encryption password:\n(Share this password with your team)');
+            if (!encKey) return;
+            this.dbEncryptionKey = encKey;
+        }
+
+        // Use Save As dialog or download
         if (this.hasFileSystemAccess()) {
             try {
                 const handle = await window.showSaveFilePicker({
@@ -737,14 +775,14 @@ const App = {
                 this.autoSyncEnabled = true;
                 await this.autoSave();
                 this.updateSyncStatus(true);
-                this.showToast('Saved! Auto-sync now enabled.', 'success');
+                this.showToast('Saved & encrypted! Auto-sync enabled.', 'success');
             } catch (err) {
                 if (err.name !== 'AbortError') {
                     this.showToast('Failed to save file', 'error');
                 }
             }
         } else {
-            // Fallback download
+            // Fallback encrypted download
             const data = {
                 version: '1.0',
                 exportedAt: new Date().toISOString(),
@@ -752,7 +790,13 @@ const App = {
                 passwords: Storage.get(Storage.KEYS.PASSWORDS) || {},
                 teams: Storage.get(Storage.KEYS.TEAMS) || {}
             };
-            const json = JSON.stringify(data, null, 2);
+            const encrypted = CryptoUtils.xorEncrypt(JSON.stringify(data), this.dbEncryptionKey);
+            const encryptedFile = {
+                version: '1.0',
+                encrypted: encrypted,
+                exportedAt: new Date().toISOString()
+            };
+            const json = JSON.stringify(encryptedFile, null, 2);
             const blob = new Blob([json], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -762,7 +806,7 @@ const App = {
             a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
-            this.showToast('Database saved!', 'success');
+            this.showToast('Encrypted database saved!', 'success');
         }
     }
 };
