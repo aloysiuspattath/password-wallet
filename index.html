@@ -124,6 +124,17 @@
               <button id="joinTeamBtn" class="btn btn-secondary btn-sm" style="flex: 1;">🔗 Join</button>
             </div>
           </div>
+
+          <!-- Admin Section (visible only to admins) -->
+          <div class="sidebar-section admin-section hidden" id="adminSection">
+            <div class="sidebar-title">Admin</div>
+            <nav class="sidebar-nav">
+              <button class="nav-item" id="manageUsersBtn">
+                <span class="nav-item-icon">👤</span>
+                Manage Users
+              </button>
+            </nav>
+          </div>
         </aside>
 
         <!-- Main Panel -->
@@ -258,6 +269,24 @@
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-primary modal-close">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Users Management Modal (Admin only) -->
+  <div class="modal-overlay" id="usersModal">
+    <div class="modal" style="max-width: 600px;">
+      <div class="modal-header">
+        <h2 class="modal-title">👤 Manage Users</h2>
+        <button class="modal-close">✕</button>
+      </div>
+      <div class="modal-body">
+        <div id="usersList" class="users-list">
+          <!-- Users will be rendered here -->
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-primary modal-close">Close</button>
       </div>
     </div>
   </div>

@@ -1044,3 +1044,75 @@ h6 {
     opacity: 1;
   }
 }
+
+/* ===== Users List (Admin) ===== */
+.users-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.user-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  background: var(--bg-glass);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-md);
+}
+
+.user-card-avatar {
+  width: 40px;
+  height: 40px;
+  background: var(--accent-gradient);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+.user-card-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.user-card-name {
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.user-card-email {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+
+.user-badge {
+  padding: 0.125rem 0.5rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.625rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.user-badge.admin {
+  background: rgba(124, 58, 237, 0.3);
+  color: var(--accent-secondary);
+}
+
+.user-badge.disabled {
+  background: rgba(239, 68, 68, 0.2);
+  color: var(--danger);
+}
+
+.user-card-actions {
+  display: flex;
+  gap: 0.5rem;
+}

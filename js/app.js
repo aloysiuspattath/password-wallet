@@ -117,6 +117,7 @@ const App = {
         document.getElementById('addPasswordBtn')?.addEventListener('click', () => this.showPasswordModal());
         document.getElementById('createTeamBtn')?.addEventListener('click', () => this.showTeamModal());
         document.getElementById('joinTeamBtn')?.addEventListener('click', () => this.showJoinTeamModal());
+        document.getElementById('manageUsersBtn')?.addEventListener('click', () => this.showUsersModal());
 
         // Modal events
         document.querySelectorAll('.modal-close').forEach(btn => {
@@ -226,6 +227,12 @@ const App = {
         // Update user info
         document.getElementById('userName').textContent = user.name;
         document.getElementById('userAvatar').textContent = user.name.charAt(0).toUpperCase();
+
+        // Show admin section if user is admin
+        const adminSection = document.getElementById('adminSection');
+        if (adminSection) {
+            adminSection.classList.toggle('hidden', !Auth.isAdmin());
+        }
 
         // Render passwords
         this.renderPasswords();
@@ -649,6 +656,70 @@ const App = {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    },
+
+    // ===== Admin Methods =====
+    showUsersModal() {
+        if (!Auth.isAdmin()) {
+            this.showToast('Admin access required', 'error');
+            return;
+        }
+        document.getElementById('usersModal').classList.add('active');
+        this.renderUsers();
+    },
+
+    renderUsers() {
+        const users = Storage.getUsers();
+        const currentUser = Auth.getCurrentUser();
+        const container = document.getElementById('usersList');
+
+        const userArray = Object.values(users);
+        if (userArray.length === 0) {
+            container.innerHTML = '<div style="text-align: center; color: var(--text-muted);">No users yet</div>';
+            return;
+        }
+
+        container.innerHTML = userArray.map(user => {
+            const isCurrentUser = user.email === currentUser.email;
+            const isAdmin = user.role === 'admin';
+            const isDisabled = user.status === 'disabled';
+
+            return `
+                <div class="user-card">
+                    <div class="user-card-avatar">${user.name.charAt(0).toUpperCase()}</div>
+                    <div class="user-card-info">
+                        <div class="user-card-name">
+                            ${this.escapeHtml(user.name)}
+                            ${isAdmin ? '<span class="user-badge admin">Admin</span>' : ''}
+                            ${isDisabled ? '<span class="user-badge disabled">Disabled</span>' : ''}
+                        </div>
+                        <div class="user-card-email">${this.escapeHtml(user.email)}</div>
+                    </div>
+                    <div class="user-card-actions">
+                        ${!isCurrentUser && !isAdmin ? `
+                            <button class="btn btn-sm ${isDisabled ? 'btn-secondary' : 'btn-danger'}" 
+                                    onclick="App.toggleUserStatus('${user.email}')">
+                                ${isDisabled ? 'Enable' : 'Disable'}
+                            </button>
+                        ` : ''}
+                    </div>
+                </div>
+            `;
+        }).join('');
+    },
+
+    toggleUserStatus(email) {
+        if (!Auth.isAdmin()) return;
+
+        const users = Storage.getUsers();
+        if (!users[email]) return;
+
+        users[email].status = users[email].status === 'disabled' ? 'active' : 'disabled';
+        Storage.set(Storage.KEYS.USERS, users);
+
+        this.renderUsers();
+        this.autoSave();
+        this.showToast(`User ${users[email].status === 'disabled' ? 'disabled' : 'enabled'}`, 'success');
     },
 
     // ===== Database Sync Methods (File System Access API) =====
