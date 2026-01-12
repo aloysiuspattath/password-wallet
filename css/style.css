@@ -334,6 +334,13 @@ h6 {
   gap: 1rem;
 }
 
+.sync-buttons {
+  display: flex;
+  gap: 0.5rem;
+  padding-right: 1rem;
+  border-right: 1px solid var(--border-glass);
+}
+
 .user-menu {
   display: flex;
   align-items: center;

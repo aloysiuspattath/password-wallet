@@ -77,6 +77,10 @@
         TeamVault
       </div>
       <div class="header-actions">
+        <div class="sync-buttons">
+          <button id="loadDbBtn" class="btn btn-secondary btn-sm" title="Load shared database">📂 Load</button>
+          <button id="saveDbBtn" class="btn btn-secondary btn-sm" title="Save database file">💾 Save</button>
+        </div>
         <div class="user-menu">
           <div class="user-avatar" id="userAvatar">U</div>
           <span class="user-name" id="userName">User</span>
@@ -257,6 +261,9 @@
       </div>
     </div>
   </div>
+
+  <!-- Hidden file input for loading DB -->
+  <input type="file" id="dbFileInput" accept=".json" style="display: none;">
 
   <!-- Toast Container -->
   <div class="toast-container" id="toastContainer"></div>

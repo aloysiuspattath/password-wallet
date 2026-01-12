@@ -66,6 +66,11 @@ const App = {
 
         // Copy invite code
         document.getElementById('copyInviteCode')?.addEventListener('click', () => this.copyInviteCode());
+
+        // Database sync buttons
+        document.getElementById('loadDbBtn')?.addEventListener('click', () => this.loadDatabase());
+        document.getElementById('saveDbBtn')?.addEventListener('click', () => this.saveDatabase());
+        document.getElementById('dbFileInput')?.addEventListener('change', e => this.handleDbFileLoad(e));
     },
 
     // ===== Auth Methods =====
@@ -560,6 +565,108 @@ const App = {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    },
+
+    // ===== Database Sync Methods =====
+    loadDatabase() {
+        document.getElementById('dbFileInput').click();
+    },
+
+    handleDbFileLoad(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            try {
+                const data = JSON.parse(event.target.result);
+                this.mergeDatabase(data);
+                this.showToast('Database loaded and merged!', 'success');
+                this.renderDashboard();
+            } catch (err) {
+                this.showToast('Invalid database file', 'error');
+            }
+        };
+        reader.readAsText(file);
+        e.target.value = ''; // Reset input
+    },
+
+    mergeDatabase(data) {
+        // Merge users
+        if (data.users) {
+            const existingUsers = Storage.get(Storage.KEYS.USERS) || {};
+            Object.assign(existingUsers, data.users);
+            Storage.set(Storage.KEYS.USERS, existingUsers);
+        }
+
+        // Merge passwords
+        if (data.passwords) {
+            const existingPasswords = Storage.get(Storage.KEYS.PASSWORDS) || {};
+            for (const email in data.passwords) {
+                if (!existingPasswords[email]) {
+                    existingPasswords[email] = [];
+                }
+                // Merge by ID, avoiding duplicates
+                const existingIds = new Set(existingPasswords[email].map(p => p.id));
+                for (const pwd of data.passwords[email]) {
+                    if (!existingIds.has(pwd.id)) {
+                        existingPasswords[email].push(pwd);
+                    }
+                }
+            }
+            Storage.set(Storage.KEYS.PASSWORDS, existingPasswords);
+        }
+
+        // Merge teams
+        if (data.teams) {
+            const existingTeams = Storage.get(Storage.KEYS.TEAMS) || {};
+            for (const teamId in data.teams) {
+                if (existingTeams[teamId]) {
+                    // Merge members
+                    const existingEmails = new Set(existingTeams[teamId].members.map(m => m.email.toLowerCase()));
+                    for (const member of data.teams[teamId].members) {
+                        if (!existingEmails.has(member.email.toLowerCase())) {
+                            existingTeams[teamId].members.push(member);
+                        }
+                    }
+                    // Merge passwords
+                    if (!existingTeams[teamId].passwords) existingTeams[teamId].passwords = [];
+                    const existingPwdIds = new Set(existingTeams[teamId].passwords.map(p => p.id));
+                    for (const pwd of (data.teams[teamId].passwords || [])) {
+                        if (!existingPwdIds.has(pwd.id)) {
+                            existingTeams[teamId].passwords.push(pwd);
+                        }
+                    }
+                } else {
+                    existingTeams[teamId] = data.teams[teamId];
+                }
+            }
+            Storage.set(Storage.KEYS.TEAMS, existingTeams);
+        }
+    },
+
+    saveDatabase() {
+        const data = {
+            version: '1.0',
+            exportedAt: new Date().toISOString(),
+            users: Storage.get(Storage.KEYS.USERS) || {},
+            passwords: Storage.get(Storage.KEYS.PASSWORDS) || {},
+            teams: Storage.get(Storage.KEYS.TEAMS) || {}
+        };
+
+        const json = JSON.stringify(data, null, 2);
+        const blob = new Blob([json], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'teamvault-db.json';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        this.showToast('Database saved! Share this file with your team.', 'success');
     }
 };
 
